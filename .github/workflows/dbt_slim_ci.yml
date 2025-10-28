@@ -1,0 +1,74 @@
+name: dbt Slim CI (Modified Models Only)
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+    paths:
+      - 'models/**'
+      - 'macros/**'
+      - 'tests/**'
+      - 'dbt_project.yml'
+
+env:
+  DBT_PROFILES_DIR: .
+
+jobs:
+  dbt_slim_ci:
+    name: Run dbt Slim CI
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dbt
+        run: |
+          pip install --upgrade pip
+          pip install dbt-snowflake==1.9.0
+      
+      - name: Create profiles.yml
+        run: |
+          mkdir -p ~/.dbt
+          cat << EOF > ~/.dbt/profiles.yml
+          netfilx:
+            target: ci
+            outputs:
+              ci:
+                type: snowflake
+                account: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+                user: ${{ secrets.SNOWFLAKE_USER }}
+                password: ${{ secrets.SNOWFLAKE_PASSWORD }}
+                role: ${{ secrets.SNOWFLAKE_ROLE }}
+                database: ${{ secrets.SNOWFLAKE_DATABASE }}
+                warehouse: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+                schema: ${{ secrets.SNOWFLAKE_SCHEMA }}_ci_${{ github.event.pull_request.number }}
+                threads: 4
+          EOF
+      
+      - name: Install dbt packages
+        run: dbt deps
+      
+      - name: Download production manifest
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: dbt_prod.yml
+          name: dbt-production-artifacts
+          path: ./prod-target/
+          if_no_artifact_found: warn
+      
+      - name: Run dbt build (modified models only)
+        run: |
+          if [ -f "./prod-target/manifest.json" ]; then
+            dbt build --select state:modified+ --defer --state ./prod-target --target ci
+          else
+            echo "No production manifest found, running full build"
+            dbt build --target ci
+          fi

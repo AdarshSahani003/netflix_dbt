@@ -1,0 +1,89 @@
+name: dbt CI
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+      - develop
+    paths:
+      - 'models/**'
+      - 'macros/**'
+      - 'tests/**'
+      - 'seeds/**'
+      - 'snapshots/**'
+      - 'dbt_project.yml'
+      - 'packages.yml'
+
+env:
+  DBT_PROFILES_DIR: .
+
+jobs:
+  dbt_ci:
+    name: Run dbt CI
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dbt
+        run: |
+          pip install --upgrade pip
+          pip install dbt-snowflake==1.9.0
+      
+      - name: Create profiles.yml
+        run: |
+          mkdir -p ~/.dbt
+          cat << EOF > ~/.dbt/profiles.yml
+          netfilx:
+            target: ci
+            outputs:
+              ci:
+                type: snowflake
+                account: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+                user: ${{ secrets.SNOWFLAKE_USER }}
+                password: ${{ secrets.SNOWFLAKE_PASSWORD }}
+                role: ${{ secrets.SNOWFLAKE_ROLE }}
+                database: ${{ secrets.SNOWFLAKE_DATABASE }}
+                warehouse: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+                schema: ${{ secrets.SNOWFLAKE_SCHEMA }}_ci_${{ github.event.pull_request.number }}
+                threads: 4
+          EOF
+      
+      - name: Install dbt packages
+        run: dbt deps
+      
+      - name: Run dbt debug
+        run: dbt debug
+      
+      - name: Run dbt seed
+        run: dbt seed --target ci
+      
+      - name: Run dbt compile
+        run: dbt compile --target ci
+      
+      - name: Run dbt run
+        run: dbt run --target ci
+      
+      - name: Run dbt test
+        run: dbt test --target ci
+      
+      - name: Generate dbt docs
+        run: dbt docs generate --target ci
+      
+      - name: Upload dbt artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dbt-artifacts
+          path: |
+            target/manifest.json
+            target/catalog.json
+            target/run_results.json

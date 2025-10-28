@@ -1,0 +1,116 @@
+name: dbt Scheduled Production Run
+
+on:
+  schedule:
+    # Run every day at 6 AM UTC (adjust timezone as needed)
+    - cron: '0 6 * * *'
+    # Run every Monday at 8 AM UTC for weekly snapshots
+    - cron: '0 8 * * 1'
+  
+  # Allow manual triggering
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'dbt target to run against'
+        required: true
+        default: 'prod'
+        type: choice
+        options:
+          - prod
+          - staging
+
+env:
+  DBT_PROFILES_DIR: .
+
+jobs:
+  dbt_scheduled_run:
+    name: Scheduled dbt Run
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dbt
+        run: |
+          pip install --upgrade pip
+          pip install dbt-snowflake==1.9.0
+      
+      - name: Create profiles.yml
+        run: |
+          mkdir -p ~/.dbt
+          cat << EOF > ~/.dbt/profiles.yml
+          netfilx:
+            target: prod
+            outputs:
+              prod:
+                type: snowflake
+                account: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+                user: ${{ secrets.SNOWFLAKE_USER }}
+                password: ${{ secrets.SNOWFLAKE_PASSWORD }}
+                role: ${{ secrets.SNOWFLAKE_ROLE }}
+                database: ${{ secrets.SNOWFLAKE_DATABASE }}
+                warehouse: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+                schema: ${{ secrets.SNOWFLAKE_SCHEMA }}
+                threads: 8
+          EOF
+      
+      - name: Install dbt packages
+        run: dbt deps
+      
+      - name: Run dbt debug
+        run: dbt debug
+      
+      - name: Run dbt seed
+        run: dbt seed --target prod
+        continue-on-error: false
+      
+      - name: Run dbt snapshots (weekly)
+        if: github.event.schedule == '0 8 * * 1'
+        run: dbt snapshot --target prod
+      
+      - name: Run dbt run (full refresh on weekends)
+        run: |
+          if [ $(date +%u) -eq 7 ]; then
+            echo "Running full refresh on Sunday"
+            dbt run --target prod --full-refresh
+          else
+            dbt run --target prod
+          fi
+      
+      - name: Run dbt test
+        run: dbt test --target prod
+      
+      - name: Generate dbt docs
+        run: dbt docs generate --target prod
+      
+      - name: Check for failures
+        if: failure()
+        run: |
+          echo "dbt run failed! Check the logs above."
+          exit 1
+      
+      - name: Upload run results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dbt-scheduled-run-${{ github.run_number }}
+          path: |
+            target/run_results.json
+            target/manifest.json
+          retention-days: 90
+      
+      # Optional: Add Slack notification on failure
+      # - name: Notify on failure
+      #   if: failure()
+      #   uses: 8398a7/action-slack@v3
+      #   with:
+      #     status: ${{ job.status }}
+      #     text: 'dbt scheduled run failed!'
+      #     webhook_url: ${{ secrets.SLACK_WEBHOOK }}
