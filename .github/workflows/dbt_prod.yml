@@ -15,14 +15,14 @@ on:
       - 'packages.yml'
   workflow_dispatch:
 
-env:
-  DBT_PROFILES_DIR: .
-
 jobs:
   dbt_production:
     name: Deploy to Production
     runs-on: ubuntu-latest
     environment: production
+    
+    env:
+      DBT_PROFILES_DIR: /home/runner/.dbt
     
     steps:
       - name: Checkout code

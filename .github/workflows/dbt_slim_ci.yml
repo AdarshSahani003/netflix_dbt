@@ -11,13 +11,13 @@ on:
       - 'tests/**'
       - 'dbt_project.yml'
 
-env:
-  DBT_PROFILES_DIR: .
-
 jobs:
   dbt_slim_ci:
     name: Run dbt Slim CI
     runs-on: ubuntu-latest
+    
+    env:
+      DBT_PROFILES_DIR: /home/runner/.dbt
     
     steps:
       - name: Checkout PR branch

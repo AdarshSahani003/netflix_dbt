@@ -19,13 +19,13 @@ on:
           - prod
           - staging
 
-env:
-  DBT_PROFILES_DIR: .
-
 jobs:
   dbt_scheduled_run:
     name: Scheduled dbt Run
     runs-on: ubuntu-latest
+    
+    env:
+      DBT_PROFILES_DIR: /home/runner/.dbt
     
     steps:
       - name: Checkout code

@@ -15,13 +15,13 @@ on:
       - 'dbt_project.yml'
       - 'packages.yml'
 
-env:
-  DBT_PROFILES_DIR: .
-
 jobs:
   dbt_ci:
     name: Run dbt CI
     runs-on: ubuntu-latest
+    
+    env:
+      DBT_PROFILES_DIR: /home/runner/.dbt
     
     steps:
       - name: Checkout code
