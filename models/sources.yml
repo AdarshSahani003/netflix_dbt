@@ -9,3 +9,5 @@ sources:
         identifier: raw_movies
       - name: r_ratings
         identifier: raw_ratings
+      - name: s_movies
+        identifier: src_movies
