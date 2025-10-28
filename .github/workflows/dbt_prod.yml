@@ -21,6 +21,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     
+    env:
+      DBT_PROFILES_DIR: /home/runner/.dbt
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

@@ -20,6 +20,9 @@ jobs:
     name: Run dbt CI
     runs-on: ubuntu-latest
     
+    env:
+      DBT_PROFILES_DIR: /home/runner/.dbt
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
