@@ -19,9 +19,6 @@ on:
           - prod
           - staging
 
-env:
-  DBT_PROFILES_DIR: .
-
 jobs:
   dbt_scheduled_run:
     name: Scheduled dbt Run

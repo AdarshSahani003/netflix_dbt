@@ -15,9 +15,6 @@ on:
       - 'dbt_project.yml'
       - 'packages.yml'
 
-env:
-  DBT_PROFILES_DIR: .
-
 jobs:
   dbt_ci:
     name: Run dbt CI

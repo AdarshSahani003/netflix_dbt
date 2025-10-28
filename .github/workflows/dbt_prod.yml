@@ -15,9 +15,6 @@ on:
       - 'packages.yml'
   workflow_dispatch:
 
-env:
-  DBT_PROFILES_DIR: .
-
 jobs:
   dbt_production:
     name: Deploy to Production
